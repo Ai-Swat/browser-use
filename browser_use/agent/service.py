@@ -1311,7 +1311,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 					go_to_url_action = {
 						'go_to_url': {
 							'url': initial_url,
-							'new_tab': False,  # Navigate in current tab
+							'new_tab': True,  # Navigate in current tab
 						}
 					}
 
