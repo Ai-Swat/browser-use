@@ -182,7 +182,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		display_files_in_done_text: bool = True,
 		include_tool_call_examples: bool = False,
 		vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',
-		llm_timeout: int = 60,
+		llm_timeout: int = 90,
 		step_timeout: int = 120,
 		preload: bool = True,
 		include_recent_events: bool = False,
@@ -797,10 +797,10 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			success = self.state.last_result[-1].success
 			if success:
 				# Green color for success
-				self.logger.info(f'📄 \033[32m Result:\033[0m {self.state.last_result[-1].extracted_content}\n\n')
+				self.logger.info(f'📄 \033[32m Result:\033[0m \n{self.state.last_result[-1].extracted_content}\n\n')
 			else:
 				# Red color for failure
-				self.logger.info(f'📄 \033[31m Result:\033[0m {self.state.last_result[-1].extracted_content}\n\n')
+				self.logger.info(f'📄 \033[31m Result:\033[0m \n{self.state.last_result[-1].extracted_content}\n\n')
 			if self.state.last_result[-1].attachments:
 				for i, file_path in enumerate(self.state.last_result[-1].attachments):
 					self.logger.info(f'👉 Attachment {i + 1}: {file_path}')
@@ -928,7 +928,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			self.logger.warning('Model returned empty action. Retrying...')
 
 			clarification_message = UserMessage(
-				content='You forgot to return an action. Please respond only with a valid JSON action according to the expected format.'
+				content='You forgot to return an action. Please respond with a valid JSON action according to the expected schema with your assessment and next actions.'
 			)
 
 			retry_messages = input_messages + [clarification_message]
@@ -1555,8 +1555,18 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 				new_target = new_selector_map.get(action.get_index())  # type: ignore
 				new_target_hash = new_target.parent_branch_hash() if new_target else None
 
+				def get_remaining_actions_str(actions: list[ActionModel], index: int) -> str:
+					remaining_actions = []
+					for remaining_action in actions[index:]:
+						action_data = remaining_action.model_dump(exclude_unset=True)
+						action_name = next(iter(action_data.keys())) if action_data else 'unknown'
+						remaining_actions.append(action_name)
+					return ', '.join(remaining_actions)
+
 				if orig_target_hash != new_target_hash:
-					msg = f'Page changed after action {i} / {total_actions}'
+					# Get names of remaining actions that won't be executed
+					remaining_actions_str = get_remaining_actions_str(actions, i)
+					msg = f'Page changed after action {i} / {total_actions}: actions {remaining_actions_str} were not executed'
 					logger.info(msg)
 					results.append(
 						ActionResult(
@@ -1571,7 +1581,8 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 				new_element_hashes = {e.parent_branch_hash() for e in new_selector_map.values()}
 				if check_for_new_elements and not new_element_hashes.issubset(cached_element_hashes):
 					# next action requires index but there are new elements on the page
-					msg = f'Something new appeared after action {i} / {total_actions}'
+					remaining_actions_str = get_remaining_actions_str(actions, i)
+					msg = f'Something new appeared after action {i} / {total_actions}: actions {remaining_actions_str} were not executed'
 					logger.info(msg)
 					results.append(
 						ActionResult(
