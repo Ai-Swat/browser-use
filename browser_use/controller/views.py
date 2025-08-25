@@ -10,16 +10,22 @@ class SearchGoogleAction(BaseModel):
 
 class GoToUrlAction(BaseModel):
 	url: str
-	new_tab: bool  # True to open in new tab, False to navigate in current tab
+	new_tab: bool = False  # True to open in new tab, False to navigate in current tab
 
 
 class ClickElementAction(BaseModel):
-	index: int
+	index: int = Field(ge=1, description='index of the element to click')
+	while_holding_ctrl: bool = Field(
+		default=False, description='set True to open any resulting navigation in a new background tab, False otherwise'
+	)
+	# expect_download: bool = Field(default=False, description='set True if expecting a download, False otherwise')  # moved to downloads_watchdog.py
+	# click_count: int = 1  # TODO
 
 
 class InputTextAction(BaseModel):
-	index: int
+	index: int = Field(ge=0, description='index of the element to input text into, 0 is the page')
 	text: str
+	clear_existing: bool = Field(default=True, description='set True to clear existing text, False to append to existing text')
 
 
 class DoneAction(BaseModel):
@@ -37,15 +43,26 @@ class StructuredOutputAction(BaseModel, Generic[T]):
 
 
 class SwitchTabAction(BaseModel):
-	page_id: int
+	url: str | None = Field(
+		default=None,
+		description='URL or URL substring of the tab to switch to, if not provided, the tab_id or most recently opened tab will be used',
+	)
+	tab_id: str | None = Field(
+		default=None,
+		min_length=4,
+		max_length=4,
+		description='exact 4 character Tab ID to match instead of URL, prefer using this if known',
+	)  # last 4 chars of TargetID
 
 
 class CloseTabAction(BaseModel):
-	page_id: int
+	tab_id: str = Field(min_length=4, max_length=4, description='4 character Tab ID')  # last 4 chars of TargetID
 
 
 class ScrollAction(BaseModel):
 	down: bool  # True to scroll down, False to scroll up
+	num_pages: float  # Number of pages to scroll (0.5 = half page, 1.0 = one page, etc.)
+	frame_element_index: int | None = None  # Optional element index to find scroll container for
 
 
 class SendKeysAction(BaseModel):
@@ -71,28 +88,10 @@ class NoParamsAction(BaseModel):
 	# No fields defined - all inputs are ignored automatically
 
 
-class Position(BaseModel):
-	x: int
-	y: int
+class GetDropdownOptionsAction(BaseModel):
+	index: int = Field(ge=1, description='index of the dropdown element to get the option values for')
 
 
-class DragDropAction(BaseModel):
-	# Element-based approach
-	element_source: str | None = Field(None, description='CSS selector or XPath of the element to drag from')
-	element_target: str | None = Field(None, description='CSS selector or XPath of the element to drop onto')
-	element_source_offset: Position | None = Field(
-		None, description='Precise position within the source element to start drag (in pixels from top-left corner)'
-	)
-	element_target_offset: Position | None = Field(
-		None, description='Precise position within the target element to drop (in pixels from top-left corner)'
-	)
-
-	# Coordinate-based approach (used if selectors not provided)
-	coord_source_x: int | None = Field(None, description='Absolute X coordinate on page to start drag from (in pixels)')
-	coord_source_y: int | None = Field(None, description='Absolute Y coordinate on page to start drag from (in pixels)')
-	coord_target_x: int | None = Field(None, description='Absolute X coordinate on page to drop at (in pixels)')
-	coord_target_y: int | None = Field(None, description='Absolute Y coordinate on page to drop at (in pixels)')
-
-	# Common options
-	steps: int | None = Field(10, description='Number of intermediate points for smoother movement (5-20 recommended)')
-	delay_ms: int | None = Field(5, description='Delay in milliseconds between steps (0 for fastest, 10-20 for more natural)')
+class SelectDropdownOptionAction(BaseModel):
+	index: int = Field(ge=1, description='index of the dropdown element to select an option for')
+	text: str = Field(description='the text or exact value of the option to select')
