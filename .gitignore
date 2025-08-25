@@ -18,7 +18,6 @@ venv/
 .idea/
 
 # Build files
-dist/
 
 # Data files
 *.gif
