@@ -182,6 +182,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		sample_images: list[ContentPartTextParam | ContentPartImageParam] | None = None,
 		final_response_after_failure: bool = True,
 		_url_shortening_limit: int = 25,
+        new_tab: bool = True,
 		**kwargs,
 	):
 		if llm is None:
@@ -296,13 +297,14 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 		self._set_browser_use_version_and_source(source)
 
 		initial_url = None
+		self.new_tab = new_tab
 
 		# only load url if no initial actions are provided
 		if self.directly_open_url and not self.state.follow_up_task and not initial_actions:
 			initial_url = self._extract_url_from_task(self.task)
 			if initial_url:
 				self.logger.info(f'🔗 Found URL in task: {initial_url}, adding as initial action...')
-				initial_actions = [{'go_to_url': {'url': initial_url, 'new_tab': False}}]
+				initial_actions = [{'go_to_url': {'url': initial_url, 'new_tab': self.new_tab}}]
 
 		self.initial_url = initial_url
 
