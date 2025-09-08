@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import platform
+import re
 import signal
 import time
 from collections.abc import Callable, Coroutine
@@ -15,6 +16,9 @@ from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Pre-compiled regex for URL detection - used in URL shortening
+URL_PATTERN = re.compile(r'https?://[^\s<>"\']+|www\.[^\s<>"\']+|[^\s<>"\']+\.[a-z]{2,}(?:/[^\s<>"\']*)?', re.IGNORECASE)
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +40,7 @@ _exiting = False
 
 # Define generic type variables for return type and parameters
 R = TypeVar('R')
+T = TypeVar('T')
 P = ParamSpec('P')
 
 
@@ -413,6 +418,19 @@ def is_unsafe_pattern(pattern: str) -> bool:
 	return '*' in bare_domain
 
 
+def is_new_tab_page(url: str) -> bool:
+	"""
+	Check if a URL is a new tab page (about:blank, chrome://new-tab-page, or chrome://newtab).
+
+	Args:
+		url: The URL to check
+
+	Returns:
+		bool: True if the URL is a new tab page, False otherwise
+	"""
+	return url in ('about:blank', 'chrome://new-tab-page/', 'chrome://new-tab-page', 'chrome://newtab/', 'chrome://newtab')
+
+
 def match_url_with_domain_pattern(url: str, domain_pattern: str, log_warnings: bool = False) -> bool:
 	"""
 	Check if a URL matches a domain pattern. SECURITY CRITICAL.
@@ -426,7 +444,7 @@ def match_url_with_domain_pattern(url: str, domain_pattern: str, log_warnings: b
 	When no scheme is specified, https is used by default for security.
 	For example, 'example.com' will match 'https://example.com' but not 'http://example.com'.
 
-	Note: about:blank must be handled at the callsite, not inside this function.
+	Note: New tab pages (about:blank, chrome://new-tab-page) must be handled at the callsite, not inside this function.
 
 	Args:
 		url: The URL to check
@@ -437,8 +455,8 @@ def match_url_with_domain_pattern(url: str, domain_pattern: str, log_warnings: b
 		bool: True if the URL matches the pattern, False otherwise
 	"""
 	try:
-		# Note: about:blank should be handled at the callsite, not here
-		if url == 'about:blank':
+		# Note: new tab pages should be handled at the callsite, not here
+		if is_new_tab_page(url):
 			return False
 
 		parsed_url = urlparse(url)
@@ -529,66 +547,6 @@ def merge_dicts(a: dict, b: dict, path: tuple[str, ...] = ()):
 	return a
 
 
-class LLMException(Exception):
-	"""Custom exception for LLM-related errors."""
-
-	def __init__(self, code: int, message: str):
-		self.code = code
-		self.message = message
-		super().__init__(message)
-
-
-def handle_llm_error(e: Exception) -> tuple[dict[str, Any], Any | None]:
-	"""
-	Handle LLM API errors and extract failed generation data when available.
-
-	Args:
-		e: The exception that occurred during LLM API call
-
-	Returns:
-		Tuple containing:
-		- response: Dict with 'raw' and 'parsed' keys
-		- parsed: Parsed data (None if extraction was needed)
-
-	Raises:
-		LLMException: If the error is not a recognized type with failed generation data
-	"""
-	# Handle OpenAI BadRequestError with failed_generation
-	if (
-		OpenAIBadRequestError
-		and isinstance(e, OpenAIBadRequestError)
-		and hasattr(e, 'body')
-		and e.body  # type: ignore[attr-defined]
-		and 'failed_generation' in e.body  # type: ignore[operator]
-	):
-		raw = e.body['failed_generation']  # type: ignore[index]
-		response = {'raw': raw, 'parsed': None}
-		parsed = None
-		logger.debug(f'Failed to do tool call, trying to parse raw response: {raw}')
-		return response, parsed
-
-	# Handle Groq BadRequestError with failed_generation
-	if (
-		GroqBadRequestError is not None
-		and isinstance(e, GroqBadRequestError)
-		and hasattr(e, 'body')
-		and e.body  # type: ignore[attr-defined]
-		and isinstance(e.body, dict)  # type: ignore[attr-defined]
-		and 'error' in e.body  # type: ignore[attr-defined]
-		and isinstance(e.body['error'], dict)  # type: ignore[attr-defined,index]
-		and 'failed_generation' in e.body['error']  # type: ignore[attr-defined,index]
-	):
-		raw = e.body['error']['failed_generation']  # type: ignore[attr-defined,index]
-		response = {'raw': raw, 'parsed': None}
-		parsed = None
-		logger.debug(f'Failed to do tool call, trying to parse raw response: {raw}')
-		return response, parsed
-
-	# If it's not a recognized error type, log and raise
-	logger.error(f'Failed to invoke model: {str(e)}')
-	raise LLMException(401, 'LLM API call failed' + str(e)) from e
-
-
 @cache
 def get_browser_use_version() -> str:
 	"""Get the browser-use package version using the same logic as Agent._set_browser_use_version_and_source"""
@@ -618,6 +576,49 @@ def get_browser_use_version() -> str:
 	except Exception as e:
 		logger.debug(f'Error detecting browser-use version: {type(e).__name__}: {e}')
 		return 'unknown'
+
+
+@cache
+def get_git_info() -> dict[str, str] | None:
+	"""Get git information if installed from git repository"""
+	try:
+		import subprocess
+
+		package_root = Path(__file__).parent.parent
+		git_dir = package_root / '.git'
+		if not git_dir.exists():
+			return None
+
+		# Get git commit hash
+		commit_hash = (
+			subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=package_root, stderr=subprocess.DEVNULL).decode().strip()
+		)
+
+		# Get git branch
+		branch = (
+			subprocess.check_output(['git', 'rev-parse', '--abbrev-ref', 'HEAD'], cwd=package_root, stderr=subprocess.DEVNULL)
+			.decode()
+			.strip()
+		)
+
+		# Get remote URL
+		remote_url = (
+			subprocess.check_output(['git', 'config', '--get', 'remote.origin.url'], cwd=package_root, stderr=subprocess.DEVNULL)
+			.decode()
+			.strip()
+		)
+
+		# Get commit timestamp
+		commit_timestamp = (
+			subprocess.check_output(['git', 'show', '-s', '--format=%ci', 'HEAD'], cwd=package_root, stderr=subprocess.DEVNULL)
+			.decode()
+			.strip()
+		)
+
+		return {'commit_hash': commit_hash, 'branch': branch, 'remote_url': remote_url, 'commit_timestamp': commit_timestamp}
+	except Exception as e:
+		logger.debug(f'Error getting git info: {type(e).__name__}: {e}')
+		return None
 
 
 def _log_pretty_path(path: str | Path | None) -> str:

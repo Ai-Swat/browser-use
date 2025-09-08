@@ -12,13 +12,12 @@ load_dotenv()
 
 # Third-party imports
 import gradio as gr  # type: ignore
-from langchain_openai import ChatOpenAI
 from rich.console import Console
 from rich.panel import Panel
 from rich.text import Text
 
 # Local module imports
-from browser_use import Agent
+from browser_use import Agent, ChatOpenAI
 
 
 @dataclass
@@ -59,7 +58,7 @@ def parse_agent_history(history_str: str) -> None:
 async def run_browser_task(
 	task: str,
 	api_key: str,
-	model: str = 'gpt-4o',
+	model: str = 'gpt-4.1',
 	headless: bool = True,
 ) -> str:
 	if not api_key.strip():
@@ -70,7 +69,7 @@ async def run_browser_task(
 	try:
 		agent = Agent(
 			task=task,
-			llm=ChatOpenAI(model='gpt-4o'),
+			llm=ChatOpenAI(model='gpt-4.1-mini'),
 		)
 		result = await agent.run()
 		#  TODO: The result could be parsed better
@@ -91,8 +90,8 @@ def create_ui():
 					placeholder='E.g., Find flights from New York to London for next week',
 					lines=3,
 				)
-				model = gr.Dropdown(choices=['gpt-4', 'gpt-3.5-turbo'], label='Model', value='gpt-4')
-				headless = gr.Checkbox(label='Run Headless', value=True)
+				model = gr.Dropdown(choices=['gpt-4.1-mini', 'gpt-5', 'o3', 'gpt-5-mini'], label='Model', value='gpt-4.1-mini')
+				headless = gr.Checkbox(label='Run Headless', value=False)
 				submit_btn = gr.Button('Run Task')
 
 			with gr.Column():

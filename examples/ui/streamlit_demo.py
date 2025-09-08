@@ -19,7 +19,7 @@ import streamlit as st  # type: ignore
 
 from browser_use import Agent
 from browser_use.browser import BrowserSession
-from browser_use.controller.service import Controller
+from browser_use.tools.service import Tools
 
 if os.name == 'nt':
 	asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -28,23 +28,23 @@ if os.name == 'nt':
 # Function to get the LLM based on provider
 def get_llm(provider: str):
 	if provider == 'anthropic':
-		from langchain_anthropic import ChatAnthropic
+		from browser_use.llm import ChatAnthropic
 
 		api_key = os.getenv('ANTHROPIC_API_KEY')
 		if not api_key:
 			st.error('Error: ANTHROPIC_API_KEY is not set. Please provide a valid API key.')
 			st.stop()
 
-		return ChatAnthropic(model_name='claude-3-5-sonnet-20240620', timeout=25, stop=None, temperature=0.0)
+		return ChatAnthropic(model='claude-3-5-sonnet-20240620', temperature=0.0)
 	elif provider == 'openai':
-		from langchain_openai import ChatOpenAI
+		from browser_use import ChatOpenAI
 
 		api_key = os.getenv('OPENAI_API_KEY')
 		if not api_key:
 			st.error('Error: OPENAI_API_KEY is not set. Please provide a valid API key.')
 			st.stop()
 
-		return ChatOpenAI(model='gpt-4o', temperature=0.0)
+		return ChatOpenAI(model='gpt-4.1', temperature=0.0)
 	else:
 		st.error(f'Unsupported provider: {provider}')
 		st.stop()
@@ -54,13 +54,13 @@ def get_llm(provider: str):
 # Function to initialize the agent
 def initialize_agent(query: str, provider: str):
 	llm = get_llm(provider)
-	controller = Controller()
+	tools = Tools()
 	browser_session = BrowserSession()
 
 	return Agent(
 		task=query,
 		llm=llm,  # type: ignore
-		controller=controller,
+		tools=tools,
 		browser_session=browser_session,
 		use_vision=True,
 		max_actions_per_step=1,
@@ -84,4 +84,4 @@ if st.button('Run Agent'):
 
 	asyncio.run(run_agent())
 
-	st.button('Close Browser', on_click=lambda: asyncio.run(browser_session.close()))
+	st.button('Close Browser', on_click=lambda: asyncio.run(browser_session.kill()))

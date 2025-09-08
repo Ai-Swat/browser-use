@@ -1,16 +1,16 @@
 import logging
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 from posthog import Posthog
 from uuid_extensions import uuid7str
 
+from browser_use.telemetry.views import BaseTelemetryEvent
+from browser_use.utils import singleton
+
 load_dotenv()
 
 from browser_use.config import CONFIG
-from browser_use.telemetry.views import BaseTelemetryEvent
-from browser_use.utils import singleton
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +18,6 @@ logger = logging.getLogger(__name__)
 POSTHOG_EVENT_SETTINGS = {
 	'process_person_profile': True,
 }
-
-
-def xdg_cache_home() -> Path:
-	default = Path.home() / '.cache'
-	if CONFIG.XDG_CACHE_HOME and (path := Path(CONFIG.XDG_CACHE_HOME)).is_absolute():
-		return path
-	return default
 
 
 @singleton
@@ -35,7 +28,7 @@ class ProductTelemetry:
 	If the environment variable `ANONYMIZED_TELEMETRY=False`, anonymized telemetry will be disabled.
 	"""
 
-	USER_ID_PATH = str(xdg_cache_home() / 'browser_use' / 'telemetry_user_id')
+	USER_ID_PATH = str(CONFIG.BROWSER_USE_CONFIG_DIR / 'device_id')
 	PROJECT_API_KEY = 'phc_F8JMNjW1i2KbGUTaW1unnDdLSPCoyc52SGRU0JecaUh'
 	HOST = 'https://eu.i.posthog.com'
 	UNKNOWN_USER_ID = 'UNKNOWN'
@@ -49,9 +42,7 @@ class ProductTelemetry:
 		if telemetry_disabled:
 			self._posthog_client = None
 		else:
-			logger.info(
-				'Anonymized telemetry enabled. See https://docs.browser-use.com/development/telemetry for more information.'
-			)
+			logger.info('Using anonymized telemetry, see https://docs.browser-use.com/development/telemetry.')
 			self._posthog_client = Posthog(
 				project_api_key=self.PROJECT_API_KEY,
 				host=self.HOST,
@@ -82,9 +73,9 @@ class ProductTelemetry:
 
 		try:
 			self._posthog_client.capture(
-				self.user_id,
-				event.name,
-				{**event.properties, **POSTHOG_EVENT_SETTINGS},
+				distinct_id=self.user_id,
+				event=event.name,
+				properties={**event.properties, **POSTHOG_EVENT_SETTINGS},
 			)
 		except Exception as e:
 			logger.error(f'Failed to send telemetry event {event.name}: {e}')
