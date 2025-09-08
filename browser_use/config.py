@@ -184,10 +184,10 @@ class FlatEnvConfig(BaseSettings):
 
 	# Logging and telemetry
 	BROWSER_USE_LOGGING_LEVEL: str = Field(default='info')
-	CDP_LOGGING_LEVEL: str = Field(default='WARNING')
+	CDP_LOGGING_LEVEL: str = Field(default='error')
 	BROWSER_USE_DEBUG_LOG_FILE: str | None = Field(default=None)
 	BROWSER_USE_INFO_LOG_FILE: str | None = Field(default=None)
-	ANONYMIZED_TELEMETRY: bool = Field(default=True)
+	ANONYMIZED_TELEMETRY: bool = Field(default=False)
 	BROWSER_USE_CLOUD_SYNC: bool | None = Field(default=None)
 	BROWSER_USE_CLOUD_API_URL: str = Field(default='https://api.browser-use.com')
 	BROWSER_USE_CLOUD_UI_URL: str = Field(default='')
