@@ -302,7 +302,7 @@ class Agent(Generic[Context, AgentStructuredOutput]):
 			initial_url = self._extract_url_from_task(self.task)
 			if initial_url:
 				self.logger.info(f'🔗 Found URL in task: {initial_url}, adding as initial action...')
-				initial_actions = [{'go_to_url': {'url': initial_url, 'new_tab': False}}]
+				initial_actions = [{'go_to_url': {'url': initial_url, 'new_tab': True}}]
 
 		self.initial_url = initial_url
 
