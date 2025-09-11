@@ -82,14 +82,14 @@ Return ONLY the key brand info, not page structure details.""",
 
 		import asyncio
 
-		#screenshot_task = asyncio.create_task(screenshot_callback(agent))
+		screenshot_task = asyncio.create_task(screenshot_callback(agent))
 
 		history = await agent.run()
 
-		# try:
-		# 	await screenshot_task
-		# except Exception as e:
-		# 	print(f'Screenshot task failed: {e}')
+		try:
+			await screenshot_task
+		except Exception as e:
+			print(f'Screenshot task failed: {e}')
 
 		analysis = history.final_result()
 		if not analysis:
