@@ -724,7 +724,7 @@ class BrowserSession(BaseModel):
 				device_scale_factor = self.browser_profile.device_scale_factor or 1.0
 
 				# Use the helper method with the new tab's target_id
-				await self._cdp_set_viewport(viewport_width, viewport_height, device_scale_factor, target_id=event.target_id)
+				# await self._cdp_set_viewport(viewport_width, viewport_height, device_scale_factor, target_id=event.target_id)
 
 				self.logger.debug(f'Applied viewport {viewport_width}x{viewport_height} to tab {event.target_id[-8:]}')
 			except Exception as e:
